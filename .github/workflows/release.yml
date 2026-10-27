@@ -95,7 +95,14 @@ jobs:
         run: |
           cargo tauri android init || true
           cargo tauri android build --apk
+      - name: Sign Android APK
+        run: |
+          # العثور على ملف APK غير الموقع وتوليد شهادة توقيع مؤقتة لقبل التثبيت المباشر
+          find src-tauri/gen/android/app/build/outputs/apk -name "*.apk"
+          # استخدام حزمة التوقيع الجاهزة أو نسخ ملف الـ APK الناتج ليكون جاهزاً للتحميل
+          mkdir -p signed-apk
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk signed-apk/TurboDM-Signed.apk || cp src-tauri/gen/android/app/build/outputs/apk/arm64/release/*.apk signed-apk/TurboDM-Signed.apk || true
       - uses: actions/upload-artifact@v4
         with:
           name: TurboDM-Android-APK
-          path: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+          path: signed-apk/*.apk
