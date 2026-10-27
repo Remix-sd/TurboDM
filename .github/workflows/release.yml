@@ -69,8 +69,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - run: sdkmanager "ndk;26.1.10909125" "platforms;android-34" "build-tools;34.0.0"
-      - run: echo "NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
+      - name: Install NDK and Build Tools
+        run: |
+          sdkmanager --install "ndk;26.1.10909125" "platforms;android-34" "build-tools;34.0.0"
+      - name: Set NDK Environment
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
@@ -86,11 +91,11 @@ jobs:
           open("app-icon.png", "wb").write(make_png(512, 512))
           '
           cargo tauri icon app-icon.png
-      - run: |
-          cargo tauri android init
+      - name: Build Android APK
+        run: |
+          cargo tauri android init --force || true
           cargo tauri android build --apk
       - uses: actions/upload-artifact@v4
         with:
           name: TurboDM-Android-APK
           path: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
-
