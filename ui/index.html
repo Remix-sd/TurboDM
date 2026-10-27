@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TurboDM - مدير التنزيلات الفائق</title>
+    <style>
+        :root {
+            --bg-main: #0f172a; --bg-card: #1e293b; --accent: #3b82f6;
+            --accent-hover: #2563eb; --success: #10b981; --text-main: #f8fafc;
+            --text-muted: #94a3b8; --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; user-select: none; }
+        .sidebar { width: 230px; background: var(--bg-card); border-left: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .brand { font-size: 1.4rem; font-weight: bold; color: var(--accent); margin-bottom: 25px; }
+        .nav-list { display: flex; flex-direction: column; gap: 8px; }
+        .nav-item { padding: 11px 14px; border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 0.92rem; }
+        .nav-item.active { background: rgba(59, 130, 246, 0.15); color: var(--accent); font-weight: bold; }
+        .server-status { font-size: 0.78rem; padding: 10px; border-radius: 8px; background: rgba(16, 185, 129, 0.1); color: var(--success); text-align: center; }
+        .main-content { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+        .add-bar { display: flex; gap: 8px; background: var(--bg-card); padding: 14px; border-radius: 12px; border: 1px solid var(--border); flex-wrap: wrap; }
+        .add-bar input { flex: 1; min-width: 220px; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); padding: 11px 14px; border-radius: 8px; outline: none; direction: ltr; }
+        .btn { background: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-video { background: #8b5cf6; }
+        .downloads-list { display: flex; flex-direction: column; gap: 12px; padding-bottom: 75px; }
+        .download-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .dl-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        .dl-title { font-weight: 600; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; }
+        .progress-container { width: 100%; height: 9px; background: var(--bg-main); border-radius: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--success)); width: 0%; transition: width 0.25s; }
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; height: 62px; flex-direction: row; padding: 6px 10px; border-left: none; border-top: 1px solid var(--border); z-index: 100; align-items: center; }
+            .brand, .server-status { display: none; }
+            .nav-list { flex-direction: row; width: 100%; justify-content: space-around; }
+            .btn { flex: 1; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div>
+            <div class="brand">⚡ TurboDM</div>
+            <div class="nav-list">
+                <div class="nav-item active">📥 كافة التنزيلات</div>
+                <div class="nav-item">🎬 مقاطع الفيديو</div>
+                <div class="nav-item">⏳ قيد التحميل</div>
+            </div>
+        </div>
+        <div class="server-status" id="serverBadge">🟢 الجسر نشط (45678)</div>
+    </div>
+    <div class="main-content">
+        <div class="add-bar">
+            <input type="text" id="urlInput" placeholder="https://example.com/file.zip أو رابط فيديو...">
+            <button class="btn" onclick="startDownload(false)">⚡ تحميل مقسم</button>
+            <button class="btn btn-video" onclick="startDownload(true)">🎬 سحب فيديو</button>
+        </div>
+        <div class="downloads-list" id="downloadsList"></div>
+    </div>
+    <script>
+        const API = "http://127.0.0.1:45678/api";
+        const downloadsList = document.getElementById('downloadsList');
+        function renderCard(id, filename) {
+            const card = document.createElement('div');
+            card.className = 'download-card';
+            card.id = `dl-${id}`;
+            card.innerHTML = `<div class="dl-header"><span class="dl-title">${filename}</span><span id="stat-${id}">0%</span></div><div class="progress-container"><div class="progress-fill" id="prog-${id}"></div></div>`;
+            downloadsList.prepend(card);
+        }
+        async function startDownload(is_video) {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+            const id = Date.now().toString();
+            const filename = decodeURIComponent(url.split('/').pop().split('?')[0] || 'file.mp4');
+            renderCard(id, filename);
+            document.getElementById('urlInput').value = '';
+            await fetch(`${API}/download`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, url, filename, segments: 8, is_video })
+            });
+        }
+        setInterval(async () => {
+            try {
+                const res = await fetch(`${API}/status`);
+                const tasks = await res.json();
+                tasks.forEach(t => {
+                    if (!document.getElementById(`dl-${t.id}`)) renderCard(t.id, t.filename);
+                    document.getElementById(`prog-${t.id}`).style.width = `${t.progress}%`;
+                    document.getElementById(`stat-${t.id}`).innerText = `${t.status} (${t.progress.toFixed(0)}%)`;
+                });
+            } catch (e) {}
+        }, 500);
+    </script>
+</body>
+</html>
